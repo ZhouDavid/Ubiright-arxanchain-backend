@@ -6,183 +6,194 @@ import time
 import base64
 import util
 
-class User:
-	def __init__(self,accountName,password,userType="Person"):
-		self._accountName = accountName
-		self._password = password
-		self._type = userType
 
-	def __handleResponse__(self,info):
-		data = json.loads(str(info['Payload']))
-		data['username'] = self._accountName;
-		with open(self._accountName+'.json','w') as file:
-			json.dump(data,file)
-		self.user_id = data['id']
-		return data['id']
-		
+def __handleResponse__(username,register_info):
+	'''
+	:param username: string, self-defined 
+	:param register_info: unicode json, info get from user_register 
+	:return: string, user_id get from arxan official blockchain server
+	'''
+	data = json.loads(str(info['Payload']))
+	data['username'] = username
+	with open(data['id']+'.json','w') as file:
+		json.dump(data,file)
+	self.user_id = data['id']
+	return data['id']
 
-	def register(self):
-		header = {"Bc-Invoke-Mode": "sync"}
-		body = {
-		    "type": "Organization",
-		    "access": self._accountName,
-		    "secret": self._password  ## 8-16 characters including upper case, lower case and digits
+
+def user_register(username,password,utype):
+	'''
+	:param username: string, self-defined
+	:param password: string, 8-16 characters including upper case, lower case and digits
+	:param utype: string, "Organization" or "Person"
+	:return: string, user_id get from arxan official blockchain server
+	'''
+	header = {"Bc-Invoke-Mode": "sync"}
+	body = {
+	    "type": utype,
+	    "access": username,
+	    "secret": password
+	}
+	try:
+		_,info = constant.walletClient.register(header,body)
+	except:
+		print('registration failed')
+		return None
+
+	finally:
+		return __handleResponse__(username,info)
+
+def create_poe(user_id,assetName):
+	'''
+	:param user_id: string, user_id got from arxahin official blockchain server
+	:param assetName: string, article name created by user
+	:return: 
+	'''
+	user_data = None
+	try:
+		with open(user_id+'.json','r') as file:
+			user_data = file.read()  # open pre_stored user data named with user_id
+	except:
+		print('user not found')
+	finally:
+		user_data = ast.literal_eval(user_data)
+		metadata = base64.b64encode(str({'count':0,'coins_earned':0}))  # initial number of read and coins eared should both be zero
+		wallet_id = user_data['id']   # also known as user_id
+		private_key_base64 = user_data['key_pair']['private_key']
+		payload = {
+			"id":"",
+			"name":assetName,
+			"hash":"", # to te decided later
+			"parent_id":"",
+			"owner":wallet_id,
+			"metadata":metadata #encoded metadata
 		}
-		try:
-			_,info = constant.walletClient.register(header,body)
-		except:
-			print('registration failed')
-			return
+		created_time = str(int(time.time())) # created timestamp
+		params = {
+			"creator": constant.ent_sign_param['creator'],
+			"created": created_time,
+			"nonce": 'ubiright', # your nonce for ed25519 signture
+			"privateB64": private_key_base64,
+			"payload": payload
+		}
+		self.payload = payload
+		self.params = params
+		header = {"Bc-Invoke-Mode": "sync"}
+		_, response = constant.walletClient.create_poe(header, payload, params)
+		assetData = json.loads(str(response['Payload']))
+		assetData['creator'] = constant.ent_sign_param['creator']
+		assetData['owner'] = wallet_id
+		assetData['name'] = assetName
+		assetData['metadata'] = metadata
+		assetData['privateB64'] = private_key_base64
+		assetData['created'] = created_time
+		with open(assetData['id']+'.json','w') as file:    # wirte asset data to json file name wit asset_id
+			json.dump(assetData,file)
+		return assetData['id']
 
-		finally:
-			return self.__handleResponse__(info)
-
-	def create_poe(self,assetName):
-		file = None
-		try:
-			file = open(self._accountName+'.json','r')
-			print self
-		except:
-			print('user not found')
-			return
-		finally:
-			user_data = ast.literal_eval(file.read())
-			metadata = base64.b64encode(str({'count':0,'coins_earned':0}))
-			wallet_id = user_data['id']   # also known as user_id
-			private_key_base64 = user_data['key_pair']['private_key']
+def update_poe(asset_id,updated_metadata):
+	data = {}
+	status_code = 200
+	try:
+		with open(asset_id+'.json','r') as file:
+			data = json.load(file)
 			payload = {
-				"id":"",
-				"name":assetName,
-				"hash":"",
-				"parent_id":"",
-				"owner":wallet_id,
-				"metadata":metadata
-			}
-			created_time = str(int(time.time()))
-			params = {
-				"creator": constant.ent_sign_param['creator'], 
-		        "created": created_time,
-		        "nonce": 'ubiright', # your nonce for ed25519 signture
-		        "privateB64": private_key_base64,
-		        "payload": payload
-			}
-			self.payload = payload
-			self.params = params
-			header = {"Bc-Invoke-Mode": "sync"}
-			_, response = constant.walletClient.create_poe(header, payload, params)
-			assetData = json.loads(str(response['Payload']))
-			assetData['creator'] = constant.ent_sign_param['creator']
-			assetData['owner'] = wallet_id
-			assetData['name'] = assetName
-			assetData['metadata'] = metadata
-			assetData['privateB64'] = private_key_base64
-			assetData['created'] = created_time
-			with open(assetData['id']+'.json','w') as file:
-				json.dump(assetData,file)
-			return assetData['id']
-
-	def update_poe(self,asset_id,updated_metadata):
-		data = {}
-		status_code = 200
-		try:
-			with open(asset_id+'.json','r') as file:
- 	 			data = json.load(file)
- 	 		payload = {
 				"id":data['id'],
 				"name":data['name'],
 				"hash":"",
 				"parent_id":"",
 				"owner":data['owner'],
 				"metadata":base64.b64encode(str(updated_metadata))
-	 		}
+			}
+			params = {
+				'creator':constant.ent_sign_param['creator'],
+				'nonce':constant.ent_sign_param['nonce'],
+				'privateB64':data['privateB64'],
+				'created':data['created'],
+				'payload':payload
+			}
+			header = {"Bc-Invoke-Mode": "sync"}
+			try:
+				_,resp = constant.walletClient.update_poe(header,payload,params)
+			except:
+				print('update failed')
+				status_code = 400
+	except:
+		print('asset_id not found')
+		status_code = 404
+	finally:
+		return status_code
 
-		 	params = {
-		 	 	'creator':constant.ent_sign_param['creator'],
-		 	 	'nonce':constant.ent_sign_param['nonce'],
-		 	 	'privateB64':data['privateB64'],
-		 	 	'created':data['created'],
-		 	 	'payload':payload
-	 	 	}
- 	 		header = {"Bc-Invoke-Mode": "sync"}
- 	 		try:
- 	 			_,resp = constant.walletClient.update_poe(header,payload,params)
-	 	 	except:
-	 	 		print('update failed')
-	 	 		status_code = 400
+def query_poe(asset_id):
+	res = util.query_poe(asset_id)
+	return res
 
- 	 	except:
- 	 		print('asset_id not found')
- 	 		status_code = 404
- 	 	
- 	 	finally:
- 	 		return status_code
+def issue_token(asset_id,amount):
+	data = {}
+	status_code = 200
+	token_id = -1
+	try:
+		with open(asset_id+'.json','r') as file:
+			data = json.load(file)
+		payload = {
+			"issuer":constant.ent_sign_param['creator'],
+			"owner":data['owner'],
+			"asset_id":data['id'],
+			"amount":amount
+		}
+		params = {
+			'creator':constant.ent_sign_param['creator'],
+			'created':str(int(time.time())),
+			'nonce':constant.ent_sign_param['nonce'],
+			'privateB64':data['privateB64'],
+			'payload':payload
+		}
+		header = {"Bc-Invoke-Mode": "sync"}
+		try:
+			_,resp=constant.walletClient.issue_colored_token(header,payload,params)
+			token_id = json.loads(str(resp['Payload']))['token_id']
+		except:
+			print('issue token failed')
+			status_code = 400
+	except:
+		print('asset_id not found')
+		status_code = 400
+	finally:
+		return (status_code,token_id)
 
- 	def query_poe(self,asset_id):
- 		res = util.query_poe(asset_id)
- 		return res
-
- 	def issue_token(self,asset_id,amount):
- 		data = {}
- 		status_code = 200
- 		token_id = -1
- 		try:
- 			with open(asset_id+'.json','r') as file:
- 				data = json.load(file)
+def transfer_token(wallet_id,amount,from_id,to_id,token_id):
+	with open(wallet_id+'.json','r') as file:
+		data = json.load(file)
+		privateB64 = data['privateB64']
+		try:
 			payload = {
-				"issuer":constant.ent_sign_param['creator'],
-				"owner":data['owner'],
-				"asset_id":data['id'],
-				"amount":amount
+				'from':from_id,
+				'to':to_id,
+				'asset_id':asset_id,
+				'tokens':[
+					{
+						'token_id':token_id,
+						'amount':amount
+					}
+				]
 			}
 			params = {
 				'creator':constant.ent_sign_param['creator'],
 				'created':str(int(time.time())),
 				'nonce':constant.ent_sign_param['nonce'],
-				'privateB64':data['privateB64'],
+				'privateB64':privateB64,
 				'payload':payload
 			}
 			header = {"Bc-Invoke-Mode": "sync"}
-			try:
-				_,resp=constant.walletClient.issue_colored_token(header,payload,params)
-				token_id = json.loads(str(resp['Payload']))['token_id']
-			except:
-				print('issue token failed')
-				status_code = 400
- 		except:
- 			print('asset_id not found')
- 			status_code = 400
- 		finally:
- 			return (status_code,token_id)
+			_,info = constant.walletClient.transfer_colored_tokens(header, payload, params)
+			return info
+		except:
+			return None
 
- 	def transfer_token(self,amount,from_id,to_id,token_id):
- 		payload = {
-	 	 	'from':from_id,
-	 	 	'to':to_id,
-	 	 	'asset_id':asset_id,
-	 	 	'tokens':[
-	 	 		{
-	 	 			'token_id':token_id,
-	 	 			'amount':amount
-	 	 		}
-	 	 	]
- 	 	}
- 	 	# data = {}
- 	 	# with open(asset_id+'.json','r') as file:
- 	 	# 	data = json.load(file)
-		params = {
-		 	'creator':constant.ent_sign_param['creator'],
-		 	'created':str(int(time.time())),
-		 	'nonce':constant.ent_sign_param['nonce'],
-		 	'privateB64':'M3RcT8XVeeQ692vmGevnKvIjdo4UBVdSCJIXnZlnHZZUdfantXzz8aQyTi1b7KJQcbSYJYzMo6nNVssiMwx9EQ==',
-		 	'payload':payload
-		}
- 	 	header = {"Bc-Invoke-Mode": "sync"}
- 	 	constant.walletClient.transfer_colored_tokens(header, payload, params)
-
- 	def query_wallet_balance(self,wallet_id):
-		header = {"Bc-Invoke-Mode": "sync"}
- 	 	_,resp = constant.walletClient.query_wallet_balance(header,wallet_id)
- 	 	return resp
+def query_wallet_balance(wallet_id):
+	header = {"Bc-Invoke-Mode": "sync"}
+ 	_,resp = constant.walletClient.query_wallet_balance(header,wallet_id)
+ 	return resp
 
 if __name__ == '__main__':
  	 user = User('test-ubiright16','Gixstudent2018')
