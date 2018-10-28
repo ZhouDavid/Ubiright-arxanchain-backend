@@ -13,11 +13,10 @@ def __handleResponse__(username,register_info):
 	:param register_info: unicode json, info get from user_register 
 	:return: string, user_id get from arxan official blockchain server
 	'''
-	data = json.loads(str(info['Payload']))
+	data = json.loads(str(register_info['Payload']))
 	data['username'] = username
 	with open(data['id']+'.json','w') as file:
 		json.dump(data,file)
-	self.user_id = data['id']
 	return data['id']
 
 
@@ -34,12 +33,12 @@ def user_register(username,password,utype):
 	    "access": username,
 	    "secret": password
 	}
+	info=None
 	try:
 		_,info = constant.walletClient.register(header,body)
 	except:
 		print('registration failed')
 		return None
-
 	finally:
 		return __handleResponse__(username,info)
 
@@ -76,8 +75,6 @@ def create_poe(user_id,assetName):
 			"privateB64": private_key_base64,
 			"payload": payload
 		}
-		self.payload = payload
-		self.params = params
 		header = {"Bc-Invoke-Mode": "sync"}
 		_, response = constant.walletClient.create_poe(header, payload, params)
 		assetData = json.loads(str(response['Payload']))
@@ -195,41 +192,18 @@ def query_wallet_balance(wallet_id):
  	_,resp = constant.walletClient.query_wallet_balance(header,wallet_id)
  	return resp
 
-if __name__ == '__main__':
- 	 user = User('test-ubiright16','Gixstudent2018')
- 	 # asset_id = user.create_poe('hello world4')
- 	 # token_id = user.issue_token(asset_id,999)
- 	 user_id1 = 'did:axn:3118752e-6f67-435d-b838-9e4a0e47809f'
- 	 user_id2 = 'did:axn:6c7b90a0-a1d2-496d-bb98-d9f7ea054822'
- 	 token_id = '3379f130c1490ad09abf805b4670e574149d36cf9f284e944f2e395a520d6bb2'
- 	 asset_id = 'did:axn:17253ed2-0712-440a-9d39-b890ab3df84b'
- 	 # print('----------before transfer1-----------')
- 	 # print(user.query_wallet_balance(user_id1))
- 	 # print(user.query_wallet_balance(user_id2))
- 	 # user.transfer_token(100,user_id1,user_id2,token_id,asset_id)
- 	 # print('----------after transfer1------------')
- 	 # print(user.query_wallet_balance(user_id1))
- 	 # print(user.query_wallet_balance(user_id2))
- 	 user.transfer_token(66,user_id2,user_id1,token_id,"")
- 	 print('----------after transfer2------------')
- 	 print(user.query_wallet_balance(user_id1))
- 	 print(user.query_wallet_balance(user_id2))
-
-
- 	 #################
- 	 # transfer token#
- 	 #################
-
-
-
- 	 #################
- 	 # query balance #
- 	 #################
-
- 	 # header = {"Bc-Invoke-Mode": "sync"}
- 	 # _,resp = constant.walletClient.query_wallet_balance(header,'did:axn:6c7b90a0-a1d2-496d-bb98-d9f7ea054822')
- 	 # print resp
-
+# if __name__ == '__main__':
+# 	# register a new user
+# 	username = 'david3'
+# 	password = 'Ubirght2018'
+# 	utype = "Person"
+# 	# user_id = user_register(username,password,utype)
+# 	# print(user_id)
+# 	user_id = "did:axn:0493018b-20a1-4593-b5f7-2366a19a5fbd"
+# 	# asset_id = create_poe(user_id,'myFirstPost')
+# 	asset_id = 'did:axn:7b99901c-2fea-425d-9b26-2223b1c438fe'
+# 	info = query_poe(asset_id)
+# 	# print(asset_id)
 
 
 			
