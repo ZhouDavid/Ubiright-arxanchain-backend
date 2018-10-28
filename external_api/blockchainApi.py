@@ -4,7 +4,6 @@ import json
 import ast
 import time
 import base64
-import util
 
 
 def __handleResponse__(username,register_info):
@@ -33,14 +32,10 @@ def user_register(username,password,utype):
 	    "access": username,
 	    "secret": password
 	}
-	info=None
-	try:
-		_,info = constant.walletClient.register(header,body)
-	except:
-		print('registration failed')
-		return None
-	finally:
-		return __handleResponse__(username,info)
+	_,info = constant.walletClient.register(header,body)
+	if info['Payload']==None:
+		return '-1'
+	return __handleResponse__(username,info)
 
 def create_poe(user_id,assetName):
 	'''
@@ -49,44 +44,44 @@ def create_poe(user_id,assetName):
 	:return: 
 	'''
 	user_data = None
-	try:
-		with open(user_id+'.json','r') as file:
-			user_data = file.read()  # open pre_stored user data named with user_id
-	except:
-		print('user not found')
-	finally:
-		user_data = ast.literal_eval(user_data)
-		metadata = base64.b64encode(str({'count':0,'coins_earned':0}))  # initial number of read and coins eared should both be zero
-		wallet_id = user_data['id']   # also known as user_id
-		private_key_base64 = user_data['key_pair']['private_key']
-		payload = {
-			"id":"",
-			"name":assetName,
-			"hash":"", # to te decided later
-			"parent_id":"",
-			"owner":wallet_id,
-			"metadata":metadata #encoded metadata
-		}
-		created_time = str(int(time.time())) # created timestamp
-		params = {
-			"creator": constant.ent_sign_param['creator'],
-			"created": created_time,
-			"nonce": 'ubiright', # your nonce for ed25519 signture
-			"privateB64": private_key_base64,
-			"payload": payload
-		}
-		header = {"Bc-Invoke-Mode": "sync"}
-		_, response = constant.walletClient.create_poe(header, payload, params)
-		assetData = json.loads(str(response['Payload']))
-		assetData['creator'] = constant.ent_sign_param['creator']
-		assetData['owner'] = wallet_id
-		assetData['name'] = assetName
-		assetData['metadata'] = metadata
-		assetData['privateB64'] = private_key_base64
-		assetData['created'] = created_time
-		with open(assetData['id']+'.json','w') as file:    # wirte asset data to json file name wit asset_id
-			json.dump(assetData,file)
-		return assetData['id']
+	if not os.path.exists(user_id+'.json'):  # judge whether user_id is valid
+		return '-1'
+	with open(user_id+'.json','r') as file:
+		user_data = file.read()  # open pre_stored user data named with user_id
+	user_data = ast.literal_eval(user_data)
+	metadata = base64.b64encode(str({'count':0,'coins_earned':0,'modified_time':[]}))  # initial number of read and coins eared should both be zero
+	wallet_id = user_data['id']   # also known as user_id
+	private_key_base64 = user_data['key_pair']['private_key']
+	payload = {
+		"id":"",
+		"name":assetName,
+		"hash":"", # to te decided later
+		"parent_id":"",
+		"owner":wallet_id,
+		"metadata":metadata #encoded metadata
+	}
+	created_time = str(int(time.time())) # created timestamp
+	params = {
+		"creator": constant.ent_sign_param['creator'],
+		"created": created_time,
+		"nonce": 'ubiright', # your nonce for ed25519 signture
+		"privateB64": private_key_base64,
+		"payload": payload
+	}
+	header = {"Bc-Invoke-Mode": "sync"}
+	_, response = constant.walletClient.create_poe(header, payload, params)
+	if response['Payload']==None:
+		return '-1'
+	assetData = json.loads(str(response['Payload']))
+	assetData['creator'] = constant.ent_sign_param['creator']
+	assetData['owner'] = wallet_id
+	assetData['name'] = assetName
+	assetData['metadata'] = metadata
+	assetData['privateB64'] = private_key_base64
+	assetData['created'] = created_time
+	with open(assetData['id']+'.json','w') as file:    # wirte asset data to json file name wit asset_id
+		json.dump(assetData,file)
+	return assetData['id']
 
 def update_poe(asset_id,updated_metadata):
 	data = {}
@@ -122,7 +117,10 @@ def update_poe(asset_id,updated_metadata):
 		return status_code
 
 def query_poe(asset_id):
-	res = util.query_poe(asset_id)
+	header = {"Bc-Invoke-Mode": "sync"}
+	time,res = constant.walletClient.query_poe(header,asset_id)
+	res = json.loads(str(res['Payload']))
+	res['metadata'] = base64.b64decode(res['metadata'])
 	return res
 
 def issue_token(asset_id,amount):
