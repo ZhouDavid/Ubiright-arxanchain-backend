@@ -1,7 +1,7 @@
 # Ubiright-arxanchain-backend
 This is a temporary blockchain-backend repo of Ubiright for the First Blockchain Competition of Chinese University 
 ## Sample Usage
-```
+```python
 import requests
 ############# register a new user ##################
 data = {'username':'ubiright_david','password':'Ubiright2018','usertype':'Person'}
