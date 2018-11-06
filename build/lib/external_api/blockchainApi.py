@@ -35,7 +35,7 @@ def user_register(username,password,utype):
 	}
 	_,info = constant.walletClient.register(header,body)
 	if info['Payload']==None:
-		return str(info)
+		return '-1'
 	return __handleResponse__(username,info)
 
 def create_poe(user_id,assetName):
@@ -205,7 +205,7 @@ if __name__ == '__main__':
 	# info = query_poe(asset_id)
 	# # print(asset_id)
 	asset_id = 'did:axn:56d55faa-cd0c-4df3-a597-68c141e02d6f'
-	info = query_poe(asset_id)
+	time,info = query_poe(asset_id)
 	print(info)
 
 
