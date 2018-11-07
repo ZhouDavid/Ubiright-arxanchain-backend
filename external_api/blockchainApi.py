@@ -4,9 +4,11 @@ import json
 import ast
 import time
 import base64
+import pandas as pd
 
-user_data_path = './user_data/'
-asset_data_path = './asset_data/'
+user_data_path = '../user_data/'
+asset_data_path = '../asset_data/'
+user2asset_path = '../user2asset/'
 def __handleResponse__(username,register_info):
 	'''
 	:param username: string, self-defined 
@@ -46,7 +48,7 @@ def create_poe(user_id,assetName):
 	'''
 	user_data = None
 	if not os.path.exists(user_data_path+user_id+'.json'):  # judge whether user_id is valid
-		return '-1'
+		return '400'
 	with open(user_data_path+user_id+'.json','r') as file:
 		user_data = file.read()  # open pre_stored user data named with user_id
 	user_data = ast.literal_eval(user_data)
@@ -82,6 +84,10 @@ def create_poe(user_id,assetName):
 	assetData['created'] = created_time
 	with open(asset_data_path+assetData['id']+'.json','w') as file:    # wirte asset data to json file name wit asset_id
 		json.dump(assetData,file)
+	with open(user2asset_path+user_id+'.csv','a') as file:
+		record = ",".join([user_id,assetData['id'],'-1','-1'])+'\n'
+		file.write(record)
+
 	return assetData['id']
 
 def update_poe(asset_id,updated_metadata):
@@ -157,21 +163,16 @@ def issue_token(asset_id,amount):
 	finally:
 		return (status_code,token_id)
 
-def transfer_token(wallet_id,amount,from_id,to_id,token_id):
-	with open(user_data_path+wallet_id+'.json','r') as file:
+def transfer_token(from_id,to_id,tokens):
+	with open(user_data_path+from_id+'.json','r') as file:
 		data = json.load(file)
-		privateB64 = data['privateB64']
+		privateB64 = data['key_pair']['private_key']
 		try:
 			payload = {
 				'from':from_id,
 				'to':to_id,
-				'asset_id':asset_id,
-				'tokens':[
-					{
-						'token_id':token_id,
-						'amount':amount
-					}
-				]
+				'asset_id':"",
+				'tokens':tokens
 			}
 			params = {
 				'creator':constant.ent_sign_param['creator'],
@@ -191,24 +192,104 @@ def query_wallet_balance(wallet_id):
  	_,resp = constant.walletClient.query_wallet_balance(header,wallet_id)
  	return resp
 			
+def issue_coins(user_id,amount):
+	filename = user2asset_path+user_id+'.csv'
+	aid = '400'
+	token_id = '-1'
+	if not os.path.isfile(filename):
+		aid = create_poe(user_id,'issue token')
+		if aid.startswith('did'):
+			f = open(filename,'w')
+			f.write(','.join(['user_id','asset_id','token_id','amount'])+'\n')
+			f.write(','.join([user_id,aid,'-1','-1'])+'\n')
+			f.close()
+		else:
+			return '-1'
+
+	df = pd.read_csv(filename)
+	for i in range(df.shape[0]):
+		# print(':{}'.format(type(df.iloc[i,2])))
+		if df.iloc[i,2]=='-1':
+			aid = df.iloc[i,1]
+			status,token_id = issue_token(aid,amount)
+			df.iloc[i,2]=str(token_id)
+			df.iloc[i,3]=float(amount)
+			df.to_csv(filename,index=False)
+			return token_id
+
+	aid = create_poe(user_id,'issue token')
+	status,token_id = issue_token(aid,amount)
+	df.loc[df.shape[0]]=[user_id,aid,token_id,amount]
+	df.to_csv(filename,index=False)
 	
+	return token_id
+
+def transfer_coins(from_id,to_id,amount):
+	filename = user2asset_path+from_id+'.csv'
+	if not os.path.isfile(filename):
+		return "user doesn't exist or has zero balance"
+		json.loads(str(response['Payload']))
+	df = pd.read_csv(filename)
+	balance_info = query_wallet_balance(from_id)
+	balance_info = json.loads(str(balance_info['Payload']))
+	balance_info = balance_info['colored_tokens']
+	balance = 0
+	for k,v in balance_info.items():
+		balance+=v['amount']
+	if balance<amount:
+		return 'balance not enough'
+	tokens = list()
+	for k,v in balance_info.items():
+		if v['amount']<=amount:
+			tokens.append({'token_id':k,'amount':v['amount']})
+			amount-=v['amount']
+		else:
+			if amount!=0:
+				tokens.append({'token_id':k,'amount':amount})
+			break
+	transfer_token(from_id,to_id,tokens)
+	return info
+
 if __name__ == '__main__':
-	# # register a new user
-	# username = 'david3'
-	# password = 'Ubirght2018'
-	# utype = "Person"
-	# # user_id = user_register(username,password,utype)
-	# # print(user_id)
-	# user_id = "did:axn:0493018b-20a1-4593-b5f7-2366a19a5fbd"
-	# # asset_id = create_poe(user_id,'myFirstPost')
-	# asset_id = 'did:axn:7b99901c-2fea-425d-9b26-2223b1c438fe'
-	# info = query_poe(asset_id)
-	# # print(asset_id)
-	asset_id = 'did:axn:56d55faa-cd0c-4df3-a597-68c141e02d6f'
-	info = query_poe(asset_id)
+	####### register a new user############
+	user_name = 'David Zhou'
+	password = 'Zhoujy123'
+	utype="Person"
+	user_id1 = user_register(user_name,password,utype)
+	print(user_name+' registered successfully, id:{}'.format(user_id1))
+
+	user_name = 'Bob Tian'
+	password = 'Tianz123'
+	user_id2 = user_register(user_name,password,utype)
+	print(user_name+' registered successfully, id:{}'.format(user_id2))
+	
+
+	print('user_id1:{}'.format(user_id1))
+	print('user_id2:{}'.format(user_id2))
+	###### 
+	# info = query_wallet_balance(user_id1)
+	# print(info)
+	##### issue coins ###############
+	amount = 200
+	token_id = issue_coins(user_id1,amount)
+
+	##### query blalance#############
+	info = query_wallet_balance(user_id1)
+	print('-----------user_id1 balance--------------')
+	print(info)
+	info = query_wallet_balance(user_id2)
+	print('-----------user_id2 balance--------------')
 	print(info)
 
+	##### transfer coins ############
+	amount = 150
+	info = transfer_coins(user_id1,user_id2,amount)
+	print('----------transfer info---------------')
+	print(info)
 
-			
-
-		
+	info = query_wallet_balance(user_id1)
+	print('-----------user_id1 balance--------------')
+	print(info)
+	info = query_wallet_balance(user_id2)
+	print('-----------user_id2 balance--------------')
+	print(info)

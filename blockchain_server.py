@@ -26,6 +26,7 @@ def query_timestamp():
 	info = query_poe(assetid)
 	return jsonify(info)
 
+@app.route()
 # @app.route("/")
 # def hello():
 #     return "POST images to /mnistify"
