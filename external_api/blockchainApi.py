@@ -6,9 +6,9 @@ import time
 import base64
 import pandas as pd
 
-user_data_path = '../user_data/'
-asset_data_path = '../asset_data/'
-user2asset_path = '../user2asset/'
+user_data_path = './user_data/'
+asset_data_path = './asset_data/'
+user2asset_path = './user2asset/'
 def __handleResponse__(username,register_info):
 	'''
 	:param username: string, self-defined 
@@ -20,7 +20,6 @@ def __handleResponse__(username,register_info):
 	with open(user_data_path+data['id']+'.json','w') as file:
 		json.dump(data,file)
 	return data['id']
-
 
 def user_register(username,password,utype):
 	'''
@@ -189,8 +188,13 @@ def transfer_token(from_id,to_id,tokens):
 
 def query_wallet_balance(wallet_id):
 	header = {"Bc-Invoke-Mode": "sync"}
- 	_,resp = constant.walletClient.query_wallet_balance(header,wallet_id)
- 	return resp
+ 	_,balance_info = constant.walletClient.query_wallet_balance(header,wallet_id)
+ 	balance_info = json.loads(str(balance_info['Payload']))
+	balance_info = balance_info['colored_tokens']
+	balance = 0
+	for k,v in balance_info.items():
+		balance+=v['amount']
+ 	return balance
 			
 def issue_coins(user_id,amount):
 	filename = user2asset_path+user_id+'.csv'
@@ -208,7 +212,6 @@ def issue_coins(user_id,amount):
 
 	df = pd.read_csv(filename)
 	for i in range(df.shape[0]):
-		# print(':{}'.format(type(df.iloc[i,2])))
 		if df.iloc[i,2]=='-1':
 			aid = df.iloc[i,1]
 			status,token_id = issue_token(aid,amount)
@@ -225,19 +228,15 @@ def issue_coins(user_id,amount):
 	return token_id
 
 def transfer_coins(from_id,to_id,amount):
-	filename = user2asset_path+from_id+'.csv'
-	if not os.path.isfile(filename):
-		return "user doesn't exist or has zero balance"
-		json.loads(str(response['Payload']))
-	df = pd.read_csv(filename)
-	balance_info = query_wallet_balance(from_id)
+	header = {"Bc-Invoke-Mode": "sync"}
+	_,balance_info = constant.walletClient.query_wallet_balance(header,from_id)
 	balance_info = json.loads(str(balance_info['Payload']))
 	balance_info = balance_info['colored_tokens']
 	balance = 0
 	for k,v in balance_info.items():
 		balance+=v['amount']
 	if balance<amount:
-		return 'balance not enough'
+		return 'insufficient balance'
 	tokens = list()
 	for k,v in balance_info.items():
 		if v['amount']<=amount:
@@ -247,42 +246,43 @@ def transfer_coins(from_id,to_id,amount):
 			if amount!=0:
 				tokens.append({'token_id':k,'amount':amount})
 			break
-	transfer_token(from_id,to_id,tokens)
+	info = transfer_token(from_id,to_id,tokens)
 	return info
 
 if __name__ == '__main__':
 	####### register a new user############
-	user_name = 'David Zhou'
-	password = 'Zhoujy123'
-	utype="Person"
-	user_id1 = user_register(user_name,password,utype)
-	print(user_name+' registered successfully, id:{}'.format(user_id1))
+	# user_name = 'David Zhou'
+	# password = 'Zhoujy123'
+	# utype="Person"
+	# user_id1 = user_register(user_name,password,utype)
+	# print(user_name+' registered successfully, id:{}'.format(user_id1))
 
-	user_name = 'Bob Tian'
-	password = 'Tianz123'
-	user_id2 = user_register(user_name,password,utype)
-	print(user_name+' registered successfully, id:{}'.format(user_id2))
+	# user_name = 'Bob Tian'
+	# password = 'Tianz123'
+	# user_id2 = user_register(user_name,password,utype)
+	# print(user_name+' registered successfully, id:{}'.format(user_id2))
 	
 
-	print('user_id1:{}'.format(user_id1))
-	print('user_id2:{}'.format(user_id2))
-	###### 
-	# info = query_wallet_balance(user_id1)
-	# print(info)
-	##### issue coins ###############
-	amount = 200
-	token_id = issue_coins(user_id1,amount)
+	# print('user_id1:{}'.format(user_id1))
+	# print('user_id2:{}'.format(user_id2))
 
-	##### query blalance#############
-	info = query_wallet_balance(user_id1)
-	print('-----------user_id1 balance--------------')
-	print(info)
-	info = query_wallet_balance(user_id2)
-	print('-----------user_id2 balance--------------')
-	print(info)
+
+	##### issue coins ###############
+	# amount = 200
+	# token_id = issue_coins(user_id1,amount)
+
+	user_id1 = 'did:axn:922a1f92-b6f2-4280-a6e4-15683d81d00b'
+	user_id2 = 'did:axn:67f9ee8a-46cc-4928-80ba-dcdfa43642c5'
+	# ##### query blalance#############
+	# info = query_wallet_balance(user_id1)
+	# print('-----------user_id1 balance--------------')
+	# print(info)
+	# info = query_wallet_balance(user_id2)
+	# print('-----------user_id2 balance--------------')
+	# print(info)
 
 	##### transfer coins ############
-	amount = 150
+	amount = 8
 	info = transfer_coins(user_id1,user_id2,amount)
 	print('----------transfer info---------------')
 	print(info)

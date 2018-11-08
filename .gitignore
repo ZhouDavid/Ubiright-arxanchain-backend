@@ -2,3 +2,4 @@ user_data/
 asset_data/
 *.key
 *.crt
+*.csv
