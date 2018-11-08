@@ -1,5 +1,5 @@
-user_data/
-asset_data/
+/user_data
+/asset_data
 *.key
 *.crt
 *.csv
